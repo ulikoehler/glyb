@@ -192,7 +192,7 @@ void font_atlas::reset(size_t width, size_t height, size_t depth)
 }
 
 atlas_entry font_atlas::create(font_face *face, int font_size, int glyph,
-    int entry_font_size, int ox, int oy, int w, int h)
+    int entry_font_size, float ox, float oy, float w, float h)
 {
     float uv[4];
     atlas_entry ae;
@@ -277,10 +277,10 @@ atlas_entry font_atlas::resize(font_face *face, int font_size, int glyph,
         std::pair<glyph_key,atlas_entry>(
             { face->font_id, font_size, glyph},
             { tmpl->bin_id, font_size, tmpl->x, tmpl->y,
-              (short)roundf((float)tmpl->ox * scale),
-              (short)roundf((float)tmpl->oy * scale),
-              (short)roundf((float)tmpl->w * scale),
-              (short)roundf((float)tmpl->h * scale),
+              tmpl->ox * scale,
+              tmpl->oy * scale,
+              tmpl->w * scale,
+              tmpl->h * scale,
               tmpl->uv }));
     return gi->second;
 }
@@ -344,7 +344,7 @@ void font_atlas::save_map(font_manager *manager, font_face *face, FILE *out)
         auto i = glyph_map.find(k);
         const glyph_key &key = i->first;
         const atlas_entry &ent = i->second;
-        fprintf(out, "%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+        fprintf(out, "%d,%d,%d,%d,%d,%g,%g,%g,%g\n",
             ent.bin_id, key.glyph(),
             ent.font_size, ent.x, ent.y, ent.ox, ent.oy, ent.w, ent.h);
     }
@@ -357,7 +357,7 @@ void font_atlas::load_map(font_manager *manager, font_face *face, FILE *in)
     do {
         int glyph;
         atlas_entry ent;
-        ret = fscanf(in, "%d,%d,%d,%hd,%hd,%hd,%hd,%hd,%hd\n",
+        ret = fscanf(in, "%d,%d,%d,%hd,%hd,%f,%f,%f,%f\n",
             &ent.bin_id, &glyph, &ent.font_size,
             &ent.x, &ent.y, &ent.ox, &ent.oy, &ent.w, &ent.h);
         if (ret == num_fields) {

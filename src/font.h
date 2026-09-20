@@ -237,16 +237,16 @@ struct glyph_entry
 {
     font_atlas *atlas;
     int bin_id, font_size;
-    short ox, oy, w, h;
+    float ox, oy, w, h;
     float uv[4];
 
     glyph_entry() = default;
     glyph_entry(font_atlas *atlas, int bin_id, int font_size,
-        int ox, int oy, int w, int h, const float uv[4]);
+        float ox, float oy, float w, float h, const float uv[4]);
 };
 
 inline glyph_entry::glyph_entry(font_atlas *atlas, int bin_id, int font_size,
-    int ox, int oy, int w, int h, const float uv[4]) :
+    float ox, float oy, float w, float h, const float uv[4]) :
     atlas(atlas), bin_id(bin_id), font_size(font_size),
     ox(ox), oy(oy), w(w), h(h), uv{uv[0], uv[1], uv[2], uv[3]} {}
 

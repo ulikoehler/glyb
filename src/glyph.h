@@ -58,13 +58,14 @@ inline span_vector::span_vector() :
 struct atlas_entry
 {
     int bin_id, font_size;
-    short x, y, ox, oy, w, h;
+    short x, y;
+    float ox, oy, w, h;
     float uv[4];
 
     atlas_entry() = default;
     atlas_entry(int bin_id);
-    atlas_entry(int bin_id, int font_size, int x, int y, int ox, int oy,
-        int w, int h, const float uv[4]);
+    atlas_entry(int bin_id, int font_size, int x, int y, float ox,
+        float oy, float w, float h, const float uv[4]);
 };
 
 inline atlas_entry::atlas_entry(int bin_id) :
@@ -72,7 +73,7 @@ inline atlas_entry::atlas_entry(int bin_id) :
     w(0), h(0), uv{0} {}
 
 inline atlas_entry::atlas_entry(int bin_id, int font_size, int x, int y,
-    int ox, int oy, int w, int h, const float uv[4]) :
+    float ox, float oy, float w, float h, const float uv[4]) :
     bin_id(bin_id), font_size(font_size), x(x), y(y), ox(ox), oy(oy),
     w(w), h(h), uv{uv[0], uv[1], uv[2], uv[3]} {}
 
@@ -126,7 +127,7 @@ struct font_atlas
     atlas_entry lookup(font_face *face, int font_size, int glyph,
         glyph_renderer *renderer);
     atlas_entry create(font_face *face, int font_size, int glyph,
-        int entry_font_size, int ox, int oy, int w, int h);
+        int entry_font_size, float ox, float oy, float w, float h);
 
     /* create entry uvs */
     void create_uvs(float uv[4], bin_rect r);
