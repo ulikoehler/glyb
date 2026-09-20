@@ -322,12 +322,33 @@ atlas_entry font_atlas::lookup(font_face *face, int font_size, int glyph,
 
 std::string font_atlas::get_path(font_face *face, file_type type)
 {
-    switch (type) {
-    case csv_file: return face->path + ".atlas.csv";
-    case png_file: return face->path + ".atlas.png";
-    case ttf_file:
-    default: return face->path;
+    if (type == ttf_file) return face->path;
+
+    /* Atlas cache lives in a writable per-user directory — the font
+     * directory itself (e.g. /usr/share/fonts) is typically read-only.
+     * GLYB_ATLAS_CACHE_DIR overrides; default is $XDG_CACHE_HOME/glyb
+     * or ~/.cache/glyb. The filename is <basename>.<path-hash>.atlas.<ext>
+     * so distinct fonts sharing a basename don't collide. */
+    const char *dir_env = getenv("GLYB_ATLAS_CACHE_DIR");
+    std::string dir;
+    if (dir_env && dir_env[0]) {
+        dir = dir_env;
+    } else {
+        const char *xdg = getenv("XDG_CACHE_HOME");
+        const char *home = getenv("HOME");
+        if (xdg && xdg[0])      dir = std::string(xdg) + "/glyb";
+        else if (home && home[0]) dir = std::string(home) + "/.cache/glyb";
+        else                    return face->path +
+            (type == csv_file ? ".atlas.csv" : ".atlas.png");
     }
+    std::string base = face->path;
+    auto slash = base.find_last_of('/');
+    if (slash != std::string::npos) base = base.substr(slash + 1);
+    char hash[32];
+    snprintf(hash, sizeof(hash), "%016zx",
+        std::hash<std::string>()(face->path));
+    return dir + "/" + base + "." + hash +
+        (type == csv_file ? ".atlas.csv" : ".atlas.png");
 }
 
 #define FLOAT32 "%.9g"
@@ -344,6 +365,11 @@ void font_atlas::save_map(font_manager *manager, font_face *face, FILE *out)
         auto i = glyph_map.find(k);
         const glyph_key &key = i->first;
         const atlas_entry &ent = i->second;
+        /* Only persist template entries (key font_size 0 — the
+         * variable-size MSDF reference entries). Resized per-size
+         * copies share the template's bin but carry scaled-down w/h;
+         * writing them would rebuild undersized bins on load. */
+        if (key.font_size() != 0) continue;
         fprintf(out, "%d,%d,%d,%d,%d,%g,%g,%g,%g\n",
             ent.bin_id, key.glyph(),
             ent.font_size, ent.x, ent.y, ent.ox, ent.oy, ent.w, ent.h);
@@ -375,10 +401,14 @@ void font_atlas::save(font_manager *manager, font_face *face)
 {
     std::string img_path = get_path(face, png_file);
     std::string csv_path = get_path(face, csv_file);
+    auto slash = csv_path.find_last_of('/');
+    if (slash != std::string::npos)
+        file::makeDir(csv_path.substr(0, slash));
     FILE *fcsv = fopen(csv_path.c_str(), "w");
     if (fcsv == nullptr) {
-        Error("error: fopen: %s: %s\n", csv_path.c_str(), strerror(errno));
-        exit(1);
+        /* cache write failures are not fatal — we just regenerate */
+        Warn("atlas cache: fopen: %s: %s\n", csv_path.c_str(), strerror(errno));
+        return;
     }
     save_map(manager, face, fcsv);
     fclose(fcsv);
@@ -394,11 +424,12 @@ void font_atlas::load(font_manager *manager, font_face *face)
     }
     FILE *fcsv = fopen(csv_path.c_str(), "r");
     if (fcsv == nullptr) {
-        Error("error: fopen: %s: %s\n", csv_path.c_str(), strerror(errno));
-        exit(1);
+        Warn("atlas cache: fopen: %s: %s\n", csv_path.c_str(), strerror(errno));
+        return;
     }
     image_ptr load_img = image::createFromFile(img_path);
     if (!load_img) {
+        fclose(fcsv);
         return;
     }
     img = load_img;
@@ -408,8 +439,12 @@ void font_atlas::load(font_manager *manager, font_face *face)
     depth = img->getBytesPerPixel();
     reset_bins();
     uv_pixel();
+    /* re-reserve the 2x2 white texel at (0,0) that create_pixels()
+     * allocates for fresh atlases — it is not part of the glyph map */
+    bp.create_explicit(-1, bin_rect(bin_point(0,0), bin_point(2,2)));
     load_map(manager, face, fcsv);
     fclose(fcsv);
+    loadedFromDisk = true;
 }
 
 

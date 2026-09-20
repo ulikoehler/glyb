@@ -147,6 +147,9 @@ struct font_atlas
     void load_map(font_manager *manager, font_face *face, FILE *in);
     void save(font_manager *manager, font_face *face);
     void load(font_manager *manager, font_face *face);
+
+    /* set by load() when the atlas was restored from the on-disk cache */
+    bool loadedFromDisk = false;
 };
 
 inline int atlas_image_filter(font_atlas *atlas)
