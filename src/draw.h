@@ -70,20 +70,22 @@ inline void draw_list_clear(draw_list &batch)
 inline void draw_list_viewport(draw_list &batch, uint x, uint y, uint w, uint h)
 {
     bool empty = batch.cmds.size() == 0;
-    draw_cmd &last = batch.cmds.back();
 
-    if (empty ||
-        (last.viewport[0] != x &&
-         last.viewport[1] != y &&
-         last.viewport[2] != w &&
-         last.viewport[3] != h))
+    if (empty)
+    {
+        batch.cmds.push_back({{ x, y, w, h }, 0, 0, 0, 0, 0});
+        return;
+    }
+
+    draw_cmd &last = batch.cmds.back();
+    if (last.viewport[0] != x &&
+        last.viewport[1] != y &&
+        last.viewport[2] != w &&
+        last.viewport[3] != h)
     {
         batch.cmds.push_back({{ x, y, w, h },
-            !empty ? last.iid : 0,
-            !empty ? last.mode : 0,
-            !empty ? last.shader : 0,
-            !empty ? last.offset + last.count : 0,
-            0
+            last.iid, last.mode, last.shader,
+            last.offset + last.count, 0
         });
     }
 }
@@ -98,7 +100,6 @@ inline void draw_list_indices(draw_list &batch, uint iid, uint mode, uint shader
     std::initializer_list<uint> l)
 {
     bool empty = batch.cmds.size() == 0;
-    draw_cmd &last = batch.cmds.back();
 
     uint start, end;
 
@@ -106,17 +107,19 @@ inline void draw_list_indices(draw_list &batch, uint iid, uint mode, uint shader
     batch.indices.insert(batch.indices.end(), l.begin(), l.end());
     end = (uint)batch.indices.size();
 
-    if (empty ||
-        last.iid != iid ||
+    if (empty)
+    {
+        batch.cmds.push_back({{ 0, 0, 0, 0 }, iid, mode, shader, start, end - start });
+        return;
+    }
+
+    draw_cmd &last = batch.cmds.back();
+    if (last.iid != iid ||
         last.mode != mode ||
         last.shader != shader)
     {
         uint vp[4];
-        if (empty) {
-            memset(vp, 0, sizeof(vp));
-        } else {
-            memcpy(vp, last.viewport, sizeof(vp));
-        }
+        memcpy(vp, last.viewport, sizeof(vp));
         batch.cmds.push_back({{ vp[0], vp[1], vp[2], vp[3] }, iid, mode, shader, start, end - start });
     } else {
         last.count += (end - start);
